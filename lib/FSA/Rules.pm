@@ -1,11 +1,9 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 943 2004-12-15 22:03:15Z theory $
+# $Id: Rules.pm 946 2004-12-15 23:48:14Z theory $
 
 use strict;
-$FSA::Rules::VERSION = '0.02';
-
-=head1 Name
+$FSA::Rules::VERSION = '0.03';
 
 =begin comment
 
@@ -14,7 +12,11 @@ other than all uppercase.
 
 =head1 NAME
 
+FSA::Rules - A simple Perl state machine
+
 =end comment
+
+=head1 Name
 
 FSA::Rules - A simple Perl state machine
 
