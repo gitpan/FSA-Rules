@@ -1,10 +1,10 @@
 #!/usr/bin/perl -w
 
-# $Id: pingpong.t 978 2004-12-17 17:31:44Z theory $
+# $Id: pingpong.t 1018 2004-12-24 18:40:46Z theory $
 
 use strict;
-#use Test::More tests => 14;
-use Test::More 'no_plan';
+use Test::More tests => 16;
+#use Test::More 'no_plan';
 
 BEGIN { use_ok('FSA::Rules') }
 
@@ -40,7 +40,7 @@ ok my $fsa = FSA::Rules->new(
 ok my $state = $fsa->start, "Start the game";
 isa_ok $state, 'FSA::State';
 is $state->name, 'ping';
-is $fsa->switch, $fsa->state, "Number $fsa->{count}: " . $fsa->state->name
+is $fsa->switch, $fsa->curr_state, "Number $fsa->{count}: " . $fsa->curr_state->name
   until $fsa->done;
 my @check = <DATA>;
 is_deeply \@msgs, \@check, "Check that the messages are in the right order";

@@ -1,9 +1,10 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 989 2004-12-17 23:31:12Z theory $
+# $Id: Rules.pm 1018 2004-12-24 18:40:46Z theory $
 
 use strict;
-$FSA::Rules::VERSION = '0.10';
+use Clone qw/clone/;
+$FSA::Rules::VERSION = '0.20';
 
 =begin comment
 
@@ -24,33 +25,27 @@ FSA::Rules - Build simple rules-based state machines in Perl
 
   my $fsa = FSA::Rules->new(
      ping => {
-         on_enter => sub { print "Entering ping\n" },
-         do       => [ sub { print "ping!\n" },
-                       sub { shift->notes(goto => 'pong'); },
-                       sub { shift->machine->{count}++ }
-         ],
-         on_exit  => sub { print "Exiting 'ping'\n" },
-         rules    => [
-             pong => sub { shift->notes('goto') eq 'pong' },
+         do => sub {
+             print "ping!\n";
+             my $state = shift;
+             $state->result('pong');
+             $state->machine->{count}++;
+         },
+         rules => [
+             game_over => sub { shift->machine->{count} >= 20 },
+             pong      => sub { shift->result eq 'pong' },
          ],
      },
 
      pong => {
-         on_enter => [ sub { print "Entering pong\n" },
-                       sub { shift->notes(goto => 'ping') } ],
-         do       => sub { print "pong!\n"; },
-         on_exit  => sub { print "Exiting 'pong'\n" },
-         rules    => [
-             ping => [ sub { shift->notes('goto') eq 'ping' },
-                       sub { print "pong to ping\n" },
-             ]
-         ],
+         do => sub { print "pong!\n" },
+         rules => [ ping => 1, ], # always goes back to pong
      },
+     game_over => { do => sub { print "Game Over" } }
   );
 
   $fsa->start;
-  $fsa->done(sub { shift->{count} >= 21 });
-  $fsa->switch until $fsa->done;
+  $fsa->switch until $fsa->at('game_over');
 
 =head1 Description
 
@@ -118,6 +113,11 @@ A value to which to set the C<done> attribute.
 
 A value to which to set the C<strict> attribute.
 
+=item state_class
+
+The name of the class to use for state objects. Defaults to "FSA::State". Use
+this parameter if you want to use a subclass of FSA::State.
+
 =back
 
 All other parameters define the state table, where each key is the name of a
@@ -166,45 +166,99 @@ argument.
 
 =item rules
 
-  rules => [
-      state1 => \&state1_rule,
-      state2 => [ \&state2_rule, \&action ],
-      state3 => 1,
-      state4 => [ 1, \&action ],
-  ]
-
 Optional. The rules for switching from the state to other states. This is an
 array reference but shaped like a hash. The keys are the names of the states
 to consider moving to, while the values are the rules for switching to that
 state. The rules will be executed in the order specified in the array
-reference, and I<they will short-circuit.> So for the sake of efficiency it's
-worthwhile to specify the switch rules most likely to evaluate to true before
-those more likely to evaluate to false.
+reference, and I<they will short-circuit> unless the C<strict> attribute has
+been set to a true value. So for the sake of efficiency it's worthwhile to
+specify the switch rules most likely to evaluate to true before those more
+likely to evaluate to false.
 
-A rule may take the form of a code reference or an array reference of code
-references. The code reference (or first code reference in the array) must
-return a true value to trigger the switch to the new state, and false not to
-switch to the new state. When executed, it will be passed the FSA::State
+Rules are best specified as hash references with the following keys:
+
+=over
+
+=item rule
+
+A code reference or value that will be evaluated to determine whether to
+switch to the specified state. The value must be true or the code reference
+must return a true value to trigger the switch to the new state, and false not
+to switch to the new state. When executed, it will be passed the FSA::State
 object for the state for which the rules were defined, along with any other
 arguments passed to C<try_switch()> or C<switch()>--the methods that execute
 the rule code references. These arguments may be inputs that are specifically
-tested to determine whether to switch states. To be polite, the rules should
-not transform the passed values if they're returning false, as other rules may
+tested to determine whether to switch states. To be polite, rules should not
+transform the passed values if they're returning false, as other rules may
 need to evaluate them (unless you're building some sort of chaining rules--but
 those aren't really rules, are they?).
 
-Any other code references in the array will be executed during the switch,
-after the C<on_exit> actions have been executed in the current state, but
-before the C<on_enter> actions execute in the new state. Two arguments will
-be passed to these code references: the FSA::State object for the state for
-which they were defined, and the FSA::State object for the new state (which
-will not yet be the current state).
+=item message
 
-A rule may also be simply specify scalar variable, in which case that value
-will be used to determine whether the rule evaluates to a true or false value.
-You may also use a simple scalar as the first item in an array reference if
-you also need to specify switch actions. Either way, a true value always
-triggers the switch, while a false value never will.
+An optional message that will be added to the current state when the rule
+specified by the C<rule> parameter evaluates to true. The message will also be
+used to label switch labels in the output of the C<graph()> method.
+
+=item actions
+
+An array reference of code references to be executed during the switch, after
+the C<on_exit> actions have been executed in the current state, but before the
+C<on_enter> actions execute in the new state. Two arguments will be passed to
+these code references: the FSA::State object for the state for which they were
+defined, and the FSA::State object for the new state (which will not yet be
+the current state).
+
+=back
+
+A couple of examples:
+
+  rules => [
+      foo => {
+          rule => 1
+      },
+      bar => {
+          rule => \&goto_bar,
+          message => 'Have we got a bar?',
+      },
+      yow => {
+          rule => \&goto_yow,
+          message => 'Yow!',
+          actions => [ \&action_one, \&action_two],
+      }
+  ]
+
+A rule may also simply be a code reference or value that will be evaluated
+when FSA::Rules is determining whether to switch to the new state. You might want
+just specify a value or code reference if you don't need a message label or
+switch actions to be executed. For example, this C<rules> specification:
+
+  rules => [
+      foo => 1
+  ]
+
+Is equivalent to this C<rules> specification:
+
+  rules => [
+      foo => { rule => 1 }
+  ]
+
+And finally, you can specify a rule as an array reference. In this case, the
+first item in the array will be evaluated to determine whether to switch to
+the new state, and any other items must be code references that will be
+executed during the switch. For example, this C<rules> specification:
+
+  rules => [
+      yow => [ \&check_yow, \&action_one, \&action_two ]
+  ]
+
+Is equivalent to this C<rules> specification:
+
+  rules => [
+      yow => {
+          rule =>  \&check_yow,
+          actions =? [ \&action_one, \&action_two ],
+      }
+  ]
 
 =back
 
@@ -215,20 +269,21 @@ my (%machines, %states);
 sub new {
     my $class = shift;
     my $self = bless {}, $class;
+    my $params = ref $_[0] ? shift : {};
     my $fsa = $machines{$self} = {
-        table => {},
-        done  => sub { return },
-        stack => [],
-        notes => {},
+        done   => sub { return },
+        notes  => {},
+        stack  => [],
+        table  => {},
+        graph  => clone(\@_),
     };
 
-    my $params = ref $_[0] ? shift : {};
-
+    $params->{state_class} ||= 'FSA::State';
     while (@_) {
         my $state = shift;
         my $def = shift;
-        require Carp && Carp::croak(qq{The state "$state" already exists})
-          if $fsa->{table}{$state};
+        $self->_croak(qq{The state "$state" already exists})
+          if exists $fsa->{table}{$state};
 
         # Setup enter, exit, and do actions.
         for (qw(on_enter do on_exit)) {
@@ -240,7 +295,7 @@ sub new {
         }
 
         # Create the state object and cache the state data.
-        my $obj = bless {}, 'FSA::State';
+        my $obj = $params->{state_class}->new;
         $def->{name} = $state;
         $def->{machine} = $self;
         $fsa->{table}{$state} = $obj;
@@ -256,18 +311,31 @@ sub new {
             my @rules;
             while (@$rule_spec) {
                 my $state = shift @$rule_spec;
-                require Carp &&Carp::croak(
+                $self->_croak(
                     qq{Unknown state "$state" referenced by state "$key"}
                 ) unless $fsa->{table}{$state};
 
                 my $rules = shift @$rule_spec;
                 my $exec = ref $rules eq 'ARRAY' ? $rules : [$rules];
                 my $rule = shift @$exec;
-                $rule = sub { $rule } unless ref $rule eq 'CODE';
+                my $message;
+                if (ref $rule eq 'HASH') {
+                    $self->_croak(qq{In rule "$state", state "$key":  you must supply a rule.})
+                      unless exists $rule->{rule};
+                    $exec    = $rule->{action}  if exists $rule->{action};
+                    $message = $rule->{message} if exists $rule->{message};
+                    $rule    = $rule->{rule};
+                }
+                if (ref $rule ne 'CODE' ) {
+                    my $val = $rule;
+                    $rule = sub { $val };
+                }
+
                 push @rules, {
-                    state => $fsa->{table}{$state},
-                    rule  => $rule,
-                    exec  => $exec,
+                    state   => $fsa->{table}{$state},
+                    rule    => $rule,
+                    exec    => $exec,
+                    message => $message,
                 };
             }
             $def->{rules} = \@rules;
@@ -302,30 +370,52 @@ be thrown. Returns the start state FSA::State object.
 sub start {
     my $self = shift;
     my $fsa = $machines{$self};
-    require Carp && Carp::croak(
+    $self->_croak(
         'Cannot start machine because it is already running'
     ) if $fsa->{current};
     my $state = $fsa->{ord}[0] or return $self;
-    $self->state($state);
+    $self->curr_state($state);
     return $state;
 }
 
 ##############################################################################
 
-=head3 state
+=head3 at
 
-  my $state = $fsa->state;
-  $fsa->state($state);
+  $fsa->switch until $fsa->at('game_over');
+
+Requires a statename. Returns false if the current machine state does not
+match the name. Otherwise, it returns the state.
+
+=cut
+
+sub at {
+    my ($self, $name) = @_;
+    $self->_croak("You must supply a state name") unless defined $name;
+    my $fsa = $machines{$self};
+    $self->_croak(qq{No such state "$name"})
+      unless exists $fsa->{table}{$name};
+    my $state = $self->curr_state or return;
+    return unless $state->name eq $name;
+    return $state;
+}
+
+##############################################################################
+
+=head3 curr_state
+
+  my $curr_state = $fsa->curr_state;
+  $fsa->curr_state($curr_state);
 
 Get or set the current FSA::State object. Pass a state name or object to set
 the state. Setting a new state will cause the C<on_exit> actions of the
 current state to be executed, if there is a current state, and then execute
 the C<on_enter> and C<do> actions of the new state. Returns the new FSA::State
-object when setting the state.
+object when setting the current state.
 
 =cut
 
-sub state {
+sub curr_state {
     my $self = shift;
     my $fsa = $machines{$self};
     my $curr = $fsa->{current};
@@ -335,12 +425,11 @@ sub state {
     unless (ref $state) {
         my $name = $state;
         $state = $fsa->{table}{$name}
-          or require Carp && Carp::croak(qq{No such state "$name"});
+          or $self->_croak(qq{No such state "$name"});
     }
 
     # Exit the current state.
     $curr->exit if $curr;
-
     # Run any switch actions.
     if (my $exec = delete $fsa->{exec}) {
         $_->($curr, $state) for @$exec;
@@ -356,6 +445,21 @@ sub state {
     $state->enter;
     $state->do;
     return $state;
+}
+
+=head3 state
+
+Deprecated alias for C<curr_state()>. This method will issue a warning and
+will be removed in a future version of FSA::Rules. Use C<curr_state()>,
+instead.
+
+=cut
+
+sub state {
+    require Carp;
+    Carp::carp "The state() method has been deprecated. Use curr_state() "
+        . "instead";
+    shift->curr_state(@_);
 }
 
 ##############################################################################
@@ -399,7 +503,7 @@ sub states {
     my $self = shift;
     my $fsa = $machines{$self};
     return wantarray ? @{$fsa->{ord}} : $fsa->{ord} unless @_;
-    return $fsa->{table}{shift()} unless @_ > 1;
+    return $fsa->{table}{+shift} unless @_ > 1;
     return wantarray ? @{$fsa->{table}}{@_} : [ @{$fsa->{table}}{@_} ];
 
 }
@@ -439,27 +543,27 @@ sub try_switch {
     my $state = $fsa->{current};
     # XXX Factor this out to the state class to evaluate the rules?
     my @rules = $state->_rules;
-    my $rule;
-    while ($rule = shift @rules) {
+    my $next;
+    while (my $rule = shift @rules) {
         my $code = $rule->{rule};
         next unless $code->($state, @_);
         $fsa->{exec} = $rule->{exec};
-        return $self->state($rule->{state}) unless @rules && $self->strict;
+        $state->message($rule->{message}) if defined $rule->{message};
+        $next = $self->curr_state($rule->{state});
         last;
     }
 
     if (@rules && $self->strict) {
         if (my @new = grep { my $c = $_->{rule}; $c->($state, @_) } @rules) {
-            require Carp;
-            Carp::croak(
+            $self->_croak(
                 'Attempt to switch from state "', $state->name,
                 '" improperly found multiple possible destination states: "',
-                join('", "', map { $_->{state}->name } $rule, @new), '"'
+                join('", "', $next->name,  map { $_->{state}->name } @new), '"'
             );
         }
     }
 
-    return undef;
+    return $next;
 }
 
 ##############################################################################
@@ -478,8 +582,7 @@ sub switch {
     my $self = shift;
     my $ret = $self->try_switch(@_);
     return $ret if defined $ret;
-    require Carp;
-    Carp::croak(
+    $self->_croak(
         'Cannot determine transition from state "',
         $machines{$self}->{current}->name, '"'
     );
@@ -519,7 +622,7 @@ Or this:
   my $fsa = FSA::Rules->new(
       foo => {
           do    => { ++shift->machine->{count} },
-          rules => [ do => 1 ],
+          rules => [ foo => 1 ],
       }
   );
   $fsa->done( sub { shift->{count} >= 5 });
@@ -579,7 +682,7 @@ state) by calling C<start()>, and then calls the C<switch()> method repeatedly
 until C<done()> returns a true value. In other words, it's a convenient
 shortcut for:
 
-    $fsa->start unless $self->state;
+    $fsa->start unless $self->curr_state;
     $fsa->switch until $self->done;
 
 But be careful when calling this method. If you have no failed switches
@@ -592,7 +695,7 @@ Returns the FSA::Rules object.
 
 sub run {
     my $self = shift;
-    $self->start unless $self->state;
+    $self->start unless $self->curr_state;
     $self->switch until $self->done;
     return $self;
 }
@@ -674,7 +777,7 @@ get the last message for that state, instead.
 
 sub last_message {
     my $self = shift;
-    return $self->state->message unless @_;
+    return $self->curr_state->message unless @_;
     return $self->states(@_)->message;
 }
 
@@ -692,7 +795,7 @@ get the last result for that state, instead.
 
 sub last_result {
     my $self = shift;
-    return $self->state->result unless @_;
+    return $self->curr_state->result unless @_;
     return $self->states(@_)->result;
 }
 
@@ -784,12 +887,80 @@ sub stacktrace {
     local $Data::Dumper::Terse     = 1;
     local $Data::Dumper::Indent    = 1;
     local $Data::Dumper::Quotekeys = 0;
+    local $Data::Dumper::Sortkeys  = 0;
     foreach my $state (@$states) {
         $stacktrace .= "State: $state->[0]\n";
         $stacktrace .= Data::Dumper::Dumper($state->[1]);
         $stacktrace .= "\n";
     }
     return $stacktrace;
+}
+
+##############################################################################
+
+=head3 graph
+
+  my $graph_viz = $fsa->graph(@graph_viz_args);
+  $graph_viz = $fas->(\%params, @graph_viz_args);
+
+Constructs and returns a L<GraphViz|GraphViz> object useful for generating
+graphical representations of the complete rules engine. The parameters to
+C<graph()> are all those supported by the GraphViz constructor; consult the
+L<GraphViz|GraphViz> documentation for details.
+
+An optional hash ref of parameters may be passed as the first argument to
+C<graph()>. The supported parameters are:
+
+=over
+
+=item label_wrap
+
+The label wrap length for graphs. Each edge on the graph has a "label." If the
+rules for a given state were specified as hash references in the call to
+C<new()>, the C<message> key will used as the label; otherwise the label is
+blank. When used as labels, messages are wrapped in order to make labels fit
+better. The default maximum line length is 25. However, you may set a
+different wrap length using this parameter.
+
+=back
+
+B<Note:> If C<GraphViz> is not available on your system, this method will warn
+and return.
+
+=cut
+
+sub graph {
+    my $self = shift;
+    eval "use GraphViz 2.00;";
+    if ($@) {
+        warn "Cannot create graph object: $@";
+        return;
+    }
+    my $params = ref $_[0] ? shift : {};
+    $params->{label_wrap} ||= 25;
+    my $machine = clone($machines{$self}->{graph});
+    my $graph = GraphViz->new(@_);
+    while (my ($state, $definition) = splice @$machine => 0, 2) {
+        $graph->add_node($state);
+        next unless exists $definition->{rules};
+        while (my ($rule, $condition) = splice @{$definition->{rules}} => 0, 2) {
+            my @edge = ($state => $rule);
+            if (ref $condition eq 'HASH' && exists $condition->{message}) {
+                $condition->{message} =~ s/(.{0,$params->{label_wrap}})\s+/$1\n/g;
+                push @edge => 'label', $condition->{message};
+            }
+            $graph->add_edge(@edge);
+        }
+    }
+    return $graph;
+}
+
+##############################################################################
+# Private error handler.
+sub _croak {
+    shift;
+    require Carp;
+    Carp::croak(@_);
 }
 
 ##############################################################################
@@ -808,6 +979,22 @@ data for other states to access, you'll likely have to stash it in the state
 machine object (in its hash implementation or via the C<notes()> method), or
 retrieve other states from the state machine using its C<states()> method
 and then access its hash data directly.
+
+=head2 Constructor
+
+=head3 new
+
+  my $state = FSA::State->new;
+
+Constructs and returns a new FSA::State object. Not intended to be called
+directly, but by FSA::Rules.
+
+=cut
+
+sub new {
+    my $class = shift;
+    return bless {@_}, $class
+}
 
 =head2 Instance Methods
 
@@ -1024,13 +1211,13 @@ __END__
 
 =over
 
-=item Add strict attribute.
+=item Factor FSA::Class into a separate file.
 
 =back
 
 =head1 Bugs
 
-Please send bug reports to <bug-fsa-statemachine@rt.cpan.org>.
+Please send bug reports to <bug-fsa-rules@rt.cpan.org>.
 
 =head1 Author
 
