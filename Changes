@@ -1,5 +1,23 @@
 Revision history for Perl extension FSA::Rules.
 
+0.21  2004-12-31T18:30:20
+      - Calling reset() now empties the machine hashref and state hashrefs.
+        [Curtis & David]
+      - User can now turn text wrapping off and on for nodes and labels.
+        [Curtis]
+      - states() will now croak if called with any non-existent states.
+        [Curtis]
+      - Added "decorate => 1" attribute to graphs to have lines drawn from
+        the edge to its corresponding label. [Curtis]
+      - Changed "label_wrap" to "text_wrap" and had it apply to all text.
+        [Curtis].
+      - Added "Text::Wrap" as a requirement. [Curtis]
+      - Fixed documentation typo--rule actions specified via a hash reference
+        rule spec are keyed off the word "action", not "actions". [David]
+      - Actions specified via a hash reference rule specification can now
+        take a code reference as well as an array referencde of code
+        references. [David]
+
 0.20  2004-12-24T18:38:57
       - Modified Synopsis to show off the result() method.
       - Other minor documentation fixes spotted by Curtis Poe.

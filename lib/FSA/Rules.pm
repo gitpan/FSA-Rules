@@ -1,10 +1,10 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 1018 2004-12-24 18:40:46Z theory $
+# $Id: Rules.pm 1042 2004-12-31 18:32:13Z theory $
 
 use strict;
 use Clone qw/clone/;
-$FSA::Rules::VERSION = '0.20';
+$FSA::Rules::VERSION = '0.21';
 
 =begin comment
 
@@ -39,7 +39,7 @@ FSA::Rules - Build simple rules-based state machines in Perl
 
      pong => {
          do => sub { print "pong!\n" },
-         rules => [ ping => 1, ], # always goes back to pong
+         rules => [ ping => 1, ], # always goes back to ping
      },
      game_over => { do => sub { print "Game Over" } }
   );
@@ -199,14 +199,14 @@ An optional message that will be added to the current state when the rule
 specified by the C<rule> parameter evaluates to true. The message will also be
 used to label switch labels in the output of the C<graph()> method.
 
-=item actions
+=item action
 
-An array reference of code references to be executed during the switch, after
-the C<on_exit> actions have been executed in the current state, but before the
-C<on_enter> actions execute in the new state. Two arguments will be passed to
-these code references: the FSA::State object for the state for which they were
-defined, and the FSA::State object for the new state (which will not yet be
-the current state).
+A code reference or an array reference of code references to be executed
+during the switch, after the C<on_exit> actions have been executed in the
+current state, but before the C<on_enter> actions execute in the new state.
+Two arguments will be passed to these code references: the FSA::State object
+for the state for which they were defined, and the FSA::State object for the
+new state (which will not yet be the current state).
 
 =back
 
@@ -223,7 +223,7 @@ A couple of examples:
       yow => {
           rule => \&goto_yow,
           message => 'Yow!',
-          actions => [ \&action_one, \&action_two],
+          action  => [ \&action_one, \&action_two],
       }
   ]
 
@@ -255,8 +255,8 @@ Is equivalent to this C<rules> specification:
 
   rules => [
       yow => {
-          rule =>  \&check_yow,
-          actions =? [ \&action_one, \&action_two ],
+          rule   =>  \&check_yow,
+          action => [ \&action_one, \&action_two ],
       }
   ]
 
@@ -322,7 +322,10 @@ sub new {
                 if (ref $rule eq 'HASH') {
                     $self->_croak(qq{In rule "$state", state "$key":  you must supply a rule.})
                       unless exists $rule->{rule};
-                    $exec    = $rule->{action}  if exists $rule->{action};
+                    $exec = ref $rule->{action} eq 'ARRAY'
+                      ? $rule->{action}
+                      : [$rule->{action}]
+                      if exists $rule->{action};
                     $message = $rule->{message} if exists $rule->{message};
                     $rule    = $rule->{rule};
                 }
@@ -497,12 +500,20 @@ machine. When called with a single state name, it returns the FSA::State object
 object for that state. When called with more than one state name arguments,
 it returns a list or array reference of those states.
 
+If called with any state names that did not exist in the original definition of
+the state machine, this method will C<croak()>.
+
 =cut
 
 sub states {
     my $self = shift;
     my $fsa = $machines{$self};
     return wantarray ? @{$fsa->{ord}} : $fsa->{ord} unless @_;
+
+    if (my @errors = grep { not exists $fsa->{table}{$_} } @_) {
+        $self->_croak("No such state(s) '@errors'");
+    }
+
     return $fsa->{table}{+shift} unless @_ > 1;
     return wantarray ? @{$fsa->{table}}{@_} : [ @{$fsa->{table}}{@_} ];
 
@@ -707,14 +718,17 @@ sub run {
   $fsa->reset;
 
 The C<reset()> method clears the stack and notes and sets the current state to
-C<undef>. Use this method when you want to reuse your state machine. Returns
-the DFA::Rules object.
+C<undef>. Also clears any temporary data stored directly in the machine hash
+reference and the state hash references. Use this method when you want to
+reuse your state machine. Returns the DFA::Rules object.
 
   my $fsa = FSA::Rules->new(@state_machine);
   $fsa->done(sub {$done});
   $fsa->run;
   # do a bunch of stuff
+  $fsa->{miscellaneous} = 42;
   $fsa->reset->run;
+  # $fsa->{miscellaneous} does not exist
 
 =cut
 
@@ -724,7 +738,11 @@ sub reset {
     $fsa->{current} = undef;
     $fsa->{notes} = {};
     @{$fsa->{stack}} = ();
-    @{$states{$_}->{index}} = () for $self->states;
+    for my $state ($self->states) {
+        @{$states{$state}->{index}} = ();
+        delete $state->{$_} for keys %$state;
+    }
+    delete $self->{$_} for keys %$self;
     return $self;
 }
 
@@ -913,14 +931,33 @@ C<graph()>. The supported parameters are:
 
 =over
 
-=item label_wrap
+=item text_wrap
 
-The label wrap length for graphs. Each edge on the graph has a "label." If the
-rules for a given state were specified as hash references in the call to
-C<new()>, the C<message> key will used as the label; otherwise the label is
-blank. When used as labels, messages are wrapped in order to make labels fit
-better. The default maximum line length is 25. However, you may set a
-different wrap length using this parameter.
+The text wrap length for graphs.  There's a lot of text on the graph.  This
+property will set the wrap length for all text to the given length using the
+C<Text::Wrap> module.
+
+Each edge on the graph has a "label." If the rules for a given state were
+specified as hash references in the call to C<new()>, the C<message> key will
+used as the label; otherwise the label is blank. When used as labels, messages
+are wrapped in order to make labels fit better. The default maximum line length
+is 25. However, you may set a different wrap length using this parameter.
+
+B<Note:> By default, text wrapping for graphs is disabled.  You must
+specifically state which text you want wrapped with either the C<wrap_nodes> or
+C<wrap_labels> parameters.
+
+=item wrap_nodes
+
+This parameter, if set to true, will wrap the node text.
+
+Due to an obscure bug that has been difficult to track down, this sometimes
+causes graphs to not display properly.  Use with caution.
+
+=item wrap_labels
+
+This parameter, if set to true, will wrap the label text.  This property
+is always safe to use.
 
 =back
 
@@ -931,25 +968,30 @@ and return.
 
 sub graph {
     my $self = shift;
-    eval "use GraphViz 2.00;";
+    eval "use GraphViz 2.00; use Text::Wrap";
     if ($@) {
         warn "Cannot create graph object: $@";
         return;
     }
     my $params = ref $_[0] ? shift : {};
-    $params->{label_wrap} ||= 25;
+    $Text::Wrap::columns = $params->{text_wrap} || 25;
     my $machine = clone($machines{$self}->{graph});
     my $graph = GraphViz->new(@_);
     while (my ($state, $definition) = splice @$machine => 0, 2) {
-        $graph->add_node($state);
+        my $node = $params->{wrap_nodes} 
+            ? wrap('','',$state) 
+            : $state;
+        $graph->add_node($node);
         next unless exists $definition->{rules};
         while (my ($rule, $condition) = splice @{$definition->{rules}} => 0, 2) {
             my @edge = ($state => $rule);
             if (ref $condition eq 'HASH' && exists $condition->{message}) {
-                $condition->{message} =~ s/(.{0,$params->{label_wrap}})\s+/$1\n/g;
-                push @edge => 'label', $condition->{message};
+                my $label = $params->{wrap_labels}
+                    ? wrap('','',$condition->{message})
+                    : $condition->{message};
+                push @edge => 'label', $label;
             }
-            $graph->add_edge(@edge);
+            $graph->add_edge(@edge, decorate => 1);
         }
     }
     return $graph;
@@ -1219,18 +1261,19 @@ __END__
 
 Please send bug reports to <bug-fsa-rules@rt.cpan.org>.
 
-=head1 Author
+=head1 Authors
 
 =begin comment
 
 Fake-out Module::Build. Delete if it ever changes to support =head1 headers
 other than all uppercase.
 
-=head1 AUTHOR
+=head1 AUTHORS
 
 =end comment
 
 David Wheeler <david@kineticode.com>
+Curtis "Ovid" Poe <eop_divo_sitruc@yahoo.com> (reverse the name to email him)
 
 =head1 Copyright and License
 

@@ -1,10 +1,10 @@
 #!/usr/bin/perl -w
 
-# $Id: base.t 1018 2004-12-24 18:40:46Z theory $
+# $Id: base.t 1042 2004-12-31 18:32:13Z theory $
 
 use strict;
 #use Test::More 'no_plan';
-use Test::More tests => 300;
+use Test::More tests => 310;
 
 my $CLASS;
 BEGIN {
@@ -221,7 +221,7 @@ ok $fsa = $CLASS->new(
         do       => sub { shift->machine->{foo}++ },
         on_exit  => sub { shift->machine->{foo_exit}++ },
         rules => [
-            bar => { 
+            bar => {
                 rule    => sub { shift->machine->{foo} },
                 message => 'some rule label',
             },
@@ -252,9 +252,14 @@ is $fsa->curr_state, $state, "... The current state should be 'bar'";
 is $fsa->{foo_exit}, 1, "... Now the 'foo' exit action should have executed";
 is $fsa->{bar}, 1, "... And the 'bar' code should now have been executed";
 is $fsa->{bar_enter}, 1, "... And the 'bar' enter action should have executed";
+
+can_ok $fsa, 'states';
 my @messages = map { $_->message } $fsa->states('foo');
 is $messages[0], 'some rule label',
   '... and states should have messages automatically added';
+eval {$fsa->states('no_such_state')};
+ok $@, '... but asking for a state that was never defined should die';
+like $@, qr/No such state\(s\) 'no_such_state'/, '... with an appropriate error message';
 
 # Try switch actions.
 ok $fsa = $CLASS->new(
@@ -532,7 +537,11 @@ is $fsa->notes('my'), 'machine',
   "... And passing in the key should return the new value";
 is_deeply $fsa->notes, { test => 'foo', key => 'val', my => 'machine' },
   "... And passing in no arguments should return the complete notes hashref";
+$fsa->{should_not_exist_after_reset} = 1;
+$fsa->states('foo')->{should_not_exist_after_reset} = 1;
 is_deeply $fsa->reset, $fsa, "... Calling reset() should return the machine";
+is_deeply $fsa, {}, "... it should be an empty hashref";
+is_deeply $fsa->states('foo'), {}, "... and the states should be empty, too";
 is $fsa->notes('key'), undef, '... And now passing in a key should return undef';
 is_deeply $fsa->notes, {}, "... and with no arguments, we should get an empty hash";
 
@@ -614,7 +623,6 @@ is $fsa->switch->name, 'foo', "... The switch back to 'foo' should succeed";
 {
     package FSA::Stately;
     @FSA::Stately::ISA = qw(FSA::State);
-
 }
 
 ok $fsa = $CLASS->new( { state_class => 'FSA::Stately'}, foo => {} ),
@@ -626,7 +634,7 @@ isa_ok $foo, 'FSA::State';
 
 # test that messages get set even if a state dies
 $fsa = $CLASS->new(
-    alpha => { 
+    alpha => {
         rules => [
             omega => {
                 rule    => 1,
@@ -637,6 +645,39 @@ $fsa = $CLASS->new(
     omega => { do => sub { die } },
 );
 $fsa->start;
-eval {$fsa->switch} until $fsa->at('omega'); 
+eval {$fsa->switch} until $fsa->at('omega');
 is $fsa->states('alpha')->message, 'If I heard a voice from heaven ...',
   '... messages should be set even if the final state dies';
+
+# Test actions passed via a hash reference rule are executed.
+ok $fsa = $CLASS->new(
+    alpha => {
+        rules => [
+            beta => {
+                rule => 1,
+                action => sub { shift->machine->notes(goto_beta => 1) }
+            },
+            omega => {
+                rule    => 1,
+            }
+        ],
+    },
+    beta => {
+        rules => [
+            omega => {
+                rule    => 1,
+                action => [
+                    sub { shift->machine->notes(goto_omega => 1) },
+                    sub { shift->machine->notes(goto_omega2 => 2) },
+                ],
+            }
+        ],
+    },
+    omega => { },
+), "Construct to test for hashref rule actions";
+ok $fsa->start, "Start the machine";
+$fsa->switch until $fsa->at('omega');
+is $fsa->notes('goto_beta'), 1, '... Beta rule action should have executed';
+is $fsa->notes('goto_omega'), 1, '... Omega rule action should have executed';
+is $fsa->notes('goto_omega2'), 2,
+  '... Second omega rule action should have executed';
