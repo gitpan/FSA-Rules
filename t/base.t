@@ -1,10 +1,10 @@
 #!/usr/bin/perl -w
 
-# $Id: base.t 949 2004-12-16 00:21:35Z theory $
+# $Id: base.t 952 2004-12-16 00:53:11Z theory $
 
 use strict;
 #use Test::More 'no_plan';
-use Test::More tests => 168;
+use Test::More tests => 176;
 
 BEGIN { use_ok('FSA::Rules') }
 
@@ -362,3 +362,29 @@ ok $err = $@, 'Attempt to specify the same state twice should throw an error';
 like $err, qr/The state "foo" already exists/,
   '... And that exception should have the proper message';
 
+# Try try_switch with parameters.
+ok $fsa = FSA::Rules->new(
+    foo => {
+        rules => [
+            bar => [ sub { $_[1]  eq 'bar' } ],
+            foo => [ sub { $_[1]  eq 'foo' } ],
+        ]
+    },
+    bar => {
+        rules => [
+            foo => [ sub { $_[1]  eq 'foo' } ],
+            bar => [ sub { $_[1]  eq 'bar' } ],
+        ]
+    }
+), 'Construct with switch rules that expect parameters.';
+
+is $fsa->start, 'foo', "... It should start with 'foo'";
+is $fsa->switch('bar'), 'bar',
+  "... It should switch to 'bar' when passed 'bar'";
+is $fsa->state, 'bar', "... So the state should now be 'bar'";
+is $fsa->switch('bar'), 'bar',
+  "... It should stay as 'bar' when passed 'bar' again";
+is $fsa->state, 'bar', "... So the state should still be 'bar'";
+is $fsa->try_switch('foo'), 'foo',
+  "... It should switch back to 'foo' when passed 'foo'";
+is $fsa->state, 'foo', "... So the state should now be back to 'foo'";
