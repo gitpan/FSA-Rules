@@ -1,9 +1,9 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 952 2004-12-16 00:53:11Z theory $
+# $Id: Rules.pm 956 2004-12-16 02:05:46Z theory $
 
 use strict;
-$FSA::Rules::VERSION = '0.05';
+$FSA::Rules::VERSION = '0.06';
 
 =begin comment
 
@@ -175,6 +175,7 @@ sub new {
         table => {},
         start => $_[0],
         done  => sub { return },
+        stack => [],
     };
 
     while (@_) {
@@ -281,10 +282,55 @@ sub state {
         $_->($self) for @$exec;
     }
 
+    # Push the new state onto the stack.
+    push @{$states{$self}->{stack}} => $state;
+
     # Set the new state.
     $states{$self}->{current} = $state;
     $_->($self) for @{$def->{on_enter}};
     $_->($self) for @{$def->{do}};
+    return $self;
+}
+
+##############################################################################
+
+=head3 stack
+
+  my $stack = $fsa->stack;
+
+Returns an array reference of all states the machine has been in beginning
+with the first state and ending with the current state. No state name will be
+added to the stack until the machine has been in that state. This method is
+useful for debugging.
+
+=cut
+
+sub stack {
+    return $states{$_[0]}->{stack};
+}
+
+##############################################################################
+
+=head3 reset
+
+  $fsa->reset;
+
+The C<reset()> method will clear the stack and set the current state to
+C<undef>. Use this method when you want to reuse your state machine. Returns
+the DFA::Rules object.
+
+  my $fsa = FSA::Rules->new(@state_machine);
+  $fsa->done(sub {$done});
+  $fsa->run;
+  # do a bunch of stuff
+  $fsa->reset->run;
+
+=cut
+
+sub reset {
+    my $self = shift;
+    $states{$self}->{stack}   = [];
+    $states{$self}->{current} = undef;
     return $self;
 }
 
