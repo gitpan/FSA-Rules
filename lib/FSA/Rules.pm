@@ -1,9 +1,9 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 956 2004-12-16 02:05:46Z theory $
+# $Id: Rules.pm 966 2004-12-16 21:47:00Z theory $
 
 use strict;
-$FSA::Rules::VERSION = '0.06';
+$FSA::Rules::VERSION = '0.07';
 
 =begin comment
 
@@ -12,13 +12,13 @@ other than all uppercase.
 
 =head1 NAME
 
-FSA::Rules - A simple Perl state machine
+FSA::Rules - Build simple state machines in Perl
 
 =end comment
 
 =head1 Name
 
-FSA::Rules - A simple Perl state machine
+FSA::Rules - Build simple state machines in Perl
 
 =head1 Synopsis
 
@@ -32,7 +32,7 @@ FSA::Rules - A simple Perl state machine
                        sub { shift->{count}++ }
          ],
          on_exit  => sub { print "Exiting 'ping'\n" },
-         rules   => [
+         rules    => [
              pong => sub { shift->{goto} eq 'pong' },
          ],
      },
@@ -42,7 +42,7 @@ FSA::Rules - A simple Perl state machine
                        sub { shift->{goto} = 'ping' } ],
          do       => sub { print "pong!\n"; },
          on_exit  => sub { print "Exiting 'pong'\n" },
-         rules   => [
+         rules    => [
              ping => [ sub { shift->{goto} eq 'ping' },
                        sub { print "pong to ping\n" },
              ],
@@ -51,16 +51,20 @@ FSA::Rules - A simple Perl state machine
   );
 
   $fsa->start;
-  $fsa->check while $fsa->{count} <= 21;
+  $fsa->done(sub { shift->{count} <= 21 });
+  $fsa->switch until $fsa->done;
 
 =head1 Description
 
-This class implements a simple FSA state machine. As a simple implementation
-of a powerful concept, it differs slightly from the ideal FSA model in that it
-does not enforce a single possible switch from one state to another. Rather,
-it short circuits the evaluation of the rules for such switches, so that the
-first rule to return a true value will trigger its switch and no other
-switch rules will be checked.
+This class implements a simple FSA state machine pattern, allowing you to
+quickly build state machines in Perl. As a simple implementation of a powerful
+concept, it differs slightly from an ideal DFA model in that it does not
+enforce a single possible switch from one state to another. Rather, it short
+circuits the evaluation of the rules for such switches, so that the first rule
+to return a true value will trigger its switch and no other switch rules will
+be checked. It differs from an NFA model in that it offers no back-tracking.
+But in truth, you can use it to build a state machine that adheres to either
+model.
 
 FSA::Rules uses named states so that it's easy to tell what state you're in
 and what state you want to go to. Each state may optionally define actions
@@ -68,10 +72,10 @@ that are triggered upon entering the state, after entering the state, and upon
 exiting the state. They may also define rules for switching to other states,
 and these rules may specify the execution of switch-specific actions. All
 actions are defined in terms of anonymous subroutines that should expect the
-FSA object itself to be passed as the sole argument.
+FSA::Rules object itself to be passed as the sole argument.
 
 FSA::Rules objects are implemented as empty hash references, so the action
-subroutines can use the FSA::Rules object passed as the sole argument to store
+subroutines can use the FSA::Rules object passed as the sole argument to stash
 data for other states to access, without the possibility of interfering with
 the state machine itself.
 
@@ -103,7 +107,8 @@ The supported keys in the state definition hash references are:
   on_enter => [ sub {... }, sub { ... } ]
 
 Optional. A code reference or array reference of code references. These will
-be executed when entering the state. The state object will be passed to each
+be executed when entering the state, after any switch actions defined by the
+C<rules> of the previous state. The FSA::Rules object will be passed to each
 code reference as the sole argument.
 
 =item do
@@ -113,8 +118,8 @@ code reference as the sole argument.
 
 Optional. A code reference or array reference of code references. These are
 the actions to be taken while in the state, and will execute after any
-C<on_enter> actions and switch actions (defined by C<rules>). The state
-object will be passed to each code reference as the sole argument.
+C<on_enter> actions. The FSA::Rules object will be passed to each code
+reference as the sole argument.
 
 =item on_exit
 
@@ -123,8 +128,8 @@ object will be passed to each code reference as the sole argument.
 
 Optional. A code reference or array reference of code references. These will
 be executed when exiting the state, before any switch actions (defined by
-C<rules>). The state object will be passed to each code reference as the sole
-argument.
+C<rules>). The FSA::Rules object will be passed to each code reference as the
+sole argument.
 
 =item rules
 
@@ -138,18 +143,22 @@ argument.
 Optional. The rules for switching from the state to other states. This is an
 array reference but shaped like a hash. The keys are the states to consider
 moving to, while the values are the rules for switching to that state. The
-rules will be executed in the order specified in the array reference, and will
-short-circuit. So for efficiency it's worthwhile to specify the switch rules
-most likely to evaluate to true before those less likely to evaluate to true.
+rules will be executed in the order specified in the array reference, and
+I<they will short-circuit.> So for the sake of efficiency it's worthwhile to
+specify the switch rules most likely to evaluate to true before those more
+likely to evaluate to false.
 
 A rule may take the form of a code reference or an array reference of code
-references. The code reference or first code reference in the array must
-return true to trigger the switch to the new state, and false not to switch to
-the new state. When executed, it will be passed the FSA::Rules object, along
-with any other arguments passed to C<try_switch()> or C<switch()>. These may
-be inputs that are specifically tested to determine whether to switch states.
-To be polite, the rules should not transform the passed values if they're
-returning false, as other rules may need to evaluate them.
+references. The code reference (or first code reference in the array) must
+return a true value to trigger the switch to the new state, and false not to
+switch to the new state. When executed, it will be passed the FSA::Rules
+object, along with any other arguments passed to C<try_switch()> or
+C<switch()>, the methods that execute the rule code references. These
+arguments may be inputs that are specifically tested to determine whether to
+switch states. To be polite, the rules should not transform the passed values
+if they're returning false, as other rules may need to evaluate them (unless
+you're building some sort of chaining rules--but those aren't really rules,
+are they?).
 
 Any other code references in the array will be executed during the switch,
 after the C<on_exit> actions have been executed in the current state, but
@@ -230,11 +239,15 @@ sub new {
 
 =head1 Instance Interface
 
-=head2 Instance Methods
+=head2 Machine Interface
+
+These methods generally apply to the FSA::Rules machine, and will be called by
+users of the machine, rather than by the state actions. See L<State
+Interface|"State Interface"> for the interface for state actions.
 
 =head3 start
 
-  $fsa->start;
+  my $state = $fsa->start;
 
 Starts the state machine by setting the state to the first state defined in
 the call to C<new()>. Returns the name of the start state.
@@ -283,54 +296,13 @@ sub state {
     }
 
     # Push the new state onto the stack.
-    push @{$states{$self}->{stack}} => $state;
+    push @{$states{$self}->{stack}}
+      => [$state => { result => undef, message => undef}];
 
     # Set the new state.
     $states{$self}->{current} = $state;
     $_->($self) for @{$def->{on_enter}};
     $_->($self) for @{$def->{do}};
-    return $self;
-}
-
-##############################################################################
-
-=head3 stack
-
-  my $stack = $fsa->stack;
-
-Returns an array reference of all states the machine has been in beginning
-with the first state and ending with the current state. No state name will be
-added to the stack until the machine has been in that state. This method is
-useful for debugging.
-
-=cut
-
-sub stack {
-    return $states{$_[0]}->{stack};
-}
-
-##############################################################################
-
-=head3 reset
-
-  $fsa->reset;
-
-The C<reset()> method will clear the stack and set the current state to
-C<undef>. Use this method when you want to reuse your state machine. Returns
-the DFA::Rules object.
-
-  my $fsa = FSA::Rules->new(@state_machine);
-  $fsa->done(sub {$done});
-  $fsa->run;
-  # do a bunch of stuff
-  $fsa->reset->run;
-
-=cut
-
-sub reset {
-    my $self = shift;
-    $states{$self}->{stack}   = [];
-    $states{$self}->{current} = undef;
     return $self;
 }
 
@@ -399,13 +371,13 @@ sub switch {
 
 Get or set a value to indicate whether the engine is done running. Or set it
 to a code reference to have that code reference called each time C<done()> is
-called without arguments and have its its return value returned. A code
+called without arguments and have I<its> return value returned. A code
 reference should expect the FSA::Rules object passed in as its only argument.
 
 This method can be useful for checking to see if your state engine is done
 running, and calling C<switch()> when it isn't. States can set it to a true
-value when they consider processing done, or you can use a code reference that
-evaluates done-ness itself. Something like this:
+value when they consider processing complete, or you can use a code reference
+that evaluates "done-ness" itself. Something like this:
 
   my $fsa = FSA::Rules->new(
       foo => {
@@ -451,26 +423,308 @@ sub done {
 
   $fsa->run;
 
-This method starts the FSA engine (if it hasn't already been set to a state)
-and then calls the C<switch()> method repeatedly until C<done()> returns a
-true value. In other words, it's a convenient shortcut for:
+This method starts the FSA::Rules engine (if it hasn't already been set to a
+state) by calling C<start()>, and then calls the C<switch()> method repeatedly
+until C<done()> returns a true value. In other words, it's a convenient
+shortcut for:
 
-    $fsa->start unless $states{$self}->{current};
+    $fsa->start unless $self->state;
     $fsa->switch until $self->done;
 
 But be careful when calling this method. If you have no failed switches
 between states and the states never set the C<done> attribute to a true value,
 then this method will never die or return, but run forever. So plan carefully!
 
-Returns the FSA object.
+Returns the FSA::Rules object.
 
 =cut
 
 sub run {
     my $self = shift;
-    $self->start unless $states{$self}->{current};
+    $self->start unless $self->state;
     $self->switch until $self->done;
     return $self;
+}
+
+##############################################################################
+
+=head3 reset
+
+  $fsa->reset;
+
+The C<reset()> method will clear the stack and set the current state to
+C<undef>. Use this method when you want to reuse your state machine. Returns
+the DFA::Rules object.
+
+  my $fsa = FSA::Rules->new(@state_machine);
+  $fsa->done(sub {$done});
+  $fsa->run;
+  # do a bunch of stuff
+  $fsa->reset->run;
+
+=cut
+
+sub reset {
+    my $self = shift;
+    $states{$self}->{stack}   = [];
+    $states{$self}->{current} = undef;
+    return $self;
+}
+
+##############################################################################
+
+=head2 State Interface
+
+Eventually states will be objects. For the time being they're not. This
+interface may therefore change, particularly the output of
+C<raw_stacktrace()>.
+
+##############################################################################
+
+=head3 set_result
+
+  my @states = (
+    # ...
+    some_state => {
+        do => sub {
+            my $fsa = shift;
+            $fsa->set_result(1);
+        },
+        rules => [
+            bad  => sub { ! shift->result },
+            good => sub {   shift->result },
+        ]
+    },
+    # ...
+  );
+
+This is a useful method to store results on a per-state basis. Anything can be
+stored in the result slot. The contents of the result slot can be returned
+with C<message()> or viewed in a C<stacktrace> or C<raw_stacktrace>.
+
+Note that C<set_result()> operates on a per-state basis. Calling it in an
+C<on_entry> action, a C<do> action and an C<on_exit> action will result in
+only the C<on_exit> value remaining.
+
+=cut
+
+sub set_result {
+    my $self = shift;
+    $states{$self}->{stack}[-1][1]{result} = shift;
+    return $self;
+}
+
+##############################################################################
+
+=head3 set_message
+
+  my @states = (
+    # ...
+    some_state => {
+        do => sub {
+            my $fsa = shift;
+            $fsa->set_message('Success!');
+        },
+        rules => [
+            bad  => sub { ! shift->message },
+            good => sub {   shift->message },
+        ]
+    },
+    # ...
+  );
+
+This is a useful method to store messages on a per-state basis. Anything can
+be stored in the message slot. The contents of the message slot can be
+returned with C<message()> or viewed in a C<stacktrace> or C<raw_stacktrace>.
+
+Note that C<set_message()> operates on a per-state basis. Calling it in an
+C<on_entry> action, a C<do> action and an C<on_exit> action will result in
+only the C<on_exit> value remaining.
+
+There is no difference between the interface of this method and that of the
+C<set_result()> method other than storing their values in different slots
+(that is, they don't set each other's values).
+
+=cut
+
+sub set_message {
+    my $self = shift;
+    $states{$self}->{stack}[-1][1]{message} = shift;
+    return $self;
+}
+
+##############################################################################
+
+=head3 result
+
+  $fsa->result([$state]);
+
+Fetch the contents of the result slot. If no state is specified, it will
+always return the results for the current state. If a state name is provided,
+it will return the I<last> result for the named state if called in scalar
+context. Otherwise, it will return I<all> of the results for the given state,
+from first to last.
+
+=cut
+
+sub result {
+    my $self = shift;
+    my @results = $self->_state_slot('result', @_);
+    return wantarray ? @results : $results[-1];
+}
+
+##############################################################################
+
+=head3 message
+
+  $fsa->message([$state]);
+
+Fetch the contents of the message slot. If no state is specified, it will
+always return the messages for the current state. If a state name is provided,
+it will return the I<last> message for the named state if called in scalar
+context. Otherwise, it will return I<all> of the messages for the given state,
+from first to last.
+
+There is no difference between the interface of this method and that of the
+C<result()> method other than storing their values in different slots (that
+is, they don't return each other's values).
+
+=cut
+
+sub message {
+    my $self = shift;
+    my @messages = $self->_state_slot('message', @_);
+    return wantarray ? @messages : $messages[-1];
+}
+
+# not documented because this *will* change when state objects
+# are introduced.
+
+sub _state_slot {
+    my $self = shift;
+    my $slot = shift;
+    return $states{$self}->{stack}[-1][1]{$slot} unless @_;
+    my $state = shift;
+    return
+      map  { $_->[1]{$slot} }
+      grep { $_->[0] eq $state }
+        @{$self->raw_stacktrace};
+}
+
+##############################################################################
+
+=head3 stack
+
+  my $stack = $fsa->stack;
+
+Returns an array reference of all states the machine has been in since it was
+created or since C<reset()> was last called, beginning with the first state
+and ending with the current state. No state name will be added to the stack
+until the machine has been in that state. This method is useful for debugging.
+
+=cut
+
+sub stack {
+    my $self = shift;
+    return [map { $_->[0] } @{$states{$self}->{stack}}];
+}
+
+##############################################################################
+
+=head3 raw_stacktrace
+
+  my $stacktrace = $fsa->raw_stacktrace;
+
+Similar to C<stack()>, This method returns an array reference of the states
+that the machine has been in. Each state is an array reference with two
+elements. The first element is the name of the state and the second element is
+a hash reference with two keys, "result" and "message". These are set to the
+values (if used) set by the C<set_result()> and C<set_message()> methods.
+
+A sample state:
+
+ [
+     some_state,
+     {
+         result  => 7,
+         message => 'A human readable message'
+     }
+ ]
+
+=cut
+
+sub raw_stacktrace {
+    my $self = shift;
+    return $states{$self}->{stack};
+}
+
+##############################################################################
+
+=head3 stacktrace
+
+  my $trace = $fsa->stacktrace;
+
+Similar to the C<stack()> method, but it also includes all C<result>s and
+C<message>s. However, this returns a human readable stacktrace with nicely
+formatted data (using Data::Dumper). If you need the raw data, see
+C<raw_stacktrace()>.
+
+For example, if your state machine ran for only three states, the output may
+resemble the following:
+
+ print $fsa->stacktrace;
+
+State: foo
+{
+  message => 'some message',
+  result => 'a'
+}
+
+State: bar
+{
+  message => 'another message',
+  result => 1
+}
+
+State: bar
+{
+  message => 'and yet another message',
+  result => 2
+}
+
+=cut
+
+sub stacktrace {
+    my $states     = shift->raw_stacktrace;
+    my $stacktrace = '';
+    require Data::Dumper;
+    local $Data::Dumper::Terse     = 1;
+    local $Data::Dumper::Indent    = 1;
+    local $Data::Dumper::Quotekeys = 0;
+    foreach my $state (@$states) {
+        $stacktrace .= "State: $state->[0]\n";
+        $stacktrace .= Data::Dumper::Dumper($state->[1]);
+        $stacktrace .= "\n";
+    }
+    return $stacktrace;
+}
+
+##############################################################################
+
+=head3 prev_state
+
+  my $prev_state = $fsa->prev_state;
+
+This returns the name of the previous state. This is useful in states where
+you need to know the state you came from. Very useful in "fail" states.
+
+=cut
+
+sub prev_state {
+    my $self = shift;
+    my $stacktrace = $self->raw_stacktrace;
+    return unless @$stacktrace > 1;
+    return $stacktrace->[-2][0];
 }
 
 1;
@@ -480,7 +734,23 @@ __END__
 
 =over
 
-=item Add tracing.
+=item Add optional parameters to new(). Paramters include:
+
+=over
+
+=item done
+
+=item start_state
+
+=item strict
+
+=item error_handler
+
+=back
+
+=item Create state objects.
+
+=item Have start() not set the state if there is already a state?
 
 =back
 
