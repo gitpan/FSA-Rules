@@ -1,14 +1,14 @@
 #!/usr/bin/perl -w
 
-# $Id: graph.t 1039 2004-12-30 20:39:05Z curtis $
+# $Id: graph.t 2704 2006-03-02 00:07:54Z theory $
 
 use strict;
 use Test::More;
 
-BEGIN { 
+BEGIN {
     eval "use GraphViz";
-    plan $@ 
-        ? (skip_all => "GraphViz cannot be loaded.") 
+    plan $@
+        ? (skip_all => "GraphViz cannot be loaded.")
         #: ('no_plan');
         : (tests => 10);
     use_ok 'FSA::Rules' or die;
