@@ -1,10 +1,10 @@
 #!/usr/bin/perl -w
 
-# $Id: base.t 1930 2005-08-08 15:58:16Z theory $
+# $Id: base.t 3021 2006-07-14 17:51:22Z theory $
 
 use strict;
 #use Test::More 'no_plan';
-use Test::More tests => 312;
+use Test::More tests => 314;
 
 my $CLASS;
 BEGIN {
@@ -23,6 +23,7 @@ is $fsa->curr_state, undef, "... The current state should be undefined";
 ok my $state =  $fsa->curr_state('foo'), "... We should be able to set the state";
 isa_ok $state, 'FSA::State';
 is $state->name, 'foo', "... The name of the current state should be 'foo'";
+is $state->label, undef, '... The label should be undef';
 is $state->machine, $fsa, '... The state object should return the machine';
 is $fsa->curr_state, $state, "... The current state should be 'foo'";
 is $fsa->done, undef, "... It should not be done";
@@ -40,6 +41,7 @@ like $err, qr/No such state "bogus"/, "... And throw the proper exception";
 # Try a do code ref.
 ok $fsa = $CLASS->new(
     foo => {
+        label => 'This is foo',
         do => sub { shift->machine->{foo}++ }
     },
 ), "Construct with a single state with an action";
@@ -49,6 +51,7 @@ is $fsa->{foo}, undef, "... The code should not have been executed";
 ok $state = $fsa->curr_state('foo'), "... We should be able to set the state";
 isa_ok $state, 'FSA::State';
 is $state->name, 'foo', "... The name of the current state should be 'foo'";
+is $state->label, 'This is foo', 'The label should be set';
 is $fsa->curr_state, $state, "... The current state should be 'foo'";
 is $fsa->{foo}, 1, "... The code should now have been executed";
 

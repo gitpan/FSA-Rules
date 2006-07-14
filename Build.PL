@@ -3,7 +3,7 @@ use Module::Build;
 my $build = Module::Build->new(
     module_name => 'FSA::Rules',
     license     => 'perl',
-    requires    => { Clone => '0.15' },
+    requires    => { },
     recommends  => {
         'GraphViz'   => '2.00',
         'Text::Wrap' => 0,
@@ -11,6 +11,6 @@ my $build = Module::Build->new(
     },
     build_requires     => { Test::Simple => '0.17' },
     create_makefile_pl => 'passthrough',
-    create_readme      => 1,
+#    create_readme      => 1,
 );
 $build->create_build_script;
