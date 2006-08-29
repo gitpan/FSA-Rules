@@ -1,9 +1,9 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 3025 2006-07-14 18:49:52Z theory $
+# $Id: Rules.pm 3126 2006-08-29 16:46:40Z theory $
 
 use strict;
-$FSA::Rules::VERSION = '0.25';
+$FSA::Rules::VERSION = '0.26';
 
 =begin comment
 
@@ -602,26 +602,27 @@ sub try_switch {
     while (my $rule = shift @rules) {
         my $code = $rule->{rule};
         next unless ref $code eq 'CODE' ? $code->($state, @_) : $code;
+
+        # Make sure that no other rules evaluate to true in strict mode.
+        if (@rules && $self->strict) {
+            if ( my @new = grep {
+                my $c = $_->{rule};
+                ref $c eq 'CODE' ? $c->( $state, @_ ) : $c
+            } @rules ) {
+                $self->_croak(
+                    'Attempt to switch from state "', $state->name, '"',
+                    ' improperly found multiple destination states: "',
+                    join('", "', map { $_->{state}->name } $rule, @new), '"'
+                );
+            }
+        }
+
+        # We're good to go.
         $fsa->{exec} = $rule->{exec};
         $state->message($rule->{message}) if defined $rule->{message};
         $next = $self->curr_state($rule->{state});
         last;
     }
-
-    if (@rules && $self->strict) {
-        if (my @new = grep {
-                my $c = $_->{rule};
-                ref $c eq 'CODE' ? $c->( $state, @_ ) : $c
-            } @rules
-        ) {
-            $self->_croak(
-                'Attempt to switch from state "', $state->name,
-                '" improperly found multiple possible destination states: "',
-                join('", "', $next->name,  map { $_->{state}->name } @new), '"'
-            );
-        }
-    }
-
     return $next;
 }
 
@@ -1282,7 +1283,7 @@ sub result {
         do => sub {
             my $state = shift;
             # Do stuff...
-            $state->message("hello");
+            $state->message('hello ', $ENV{USER});
         },
         rules => [
             bad  => sub { ! shift->message },
@@ -1300,10 +1301,6 @@ of the messages for the state for each time it has been entered into, from
 first to last. The contents of each message slot can also be viewed in a
 C<stacktrace> or C<raw_stacktrace>.
 
-There is no difference between the interface of this method and that of the
-C<result()> method other than storing their values in different slots (that
-is, they don't get or set each other's values).
-
 =cut
 
 sub message {
@@ -1311,7 +1308,7 @@ sub message {
     return $self->_state_slot('message') unless @_;
     # XXX Yow!
     $machines{$self->machine}->{stack}[$states{$self}->{index}[-1]][1]{message}
-        = shift;
+        = join '', @_;
     return $self;
 }
 

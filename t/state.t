@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: state.t 1018 2004-12-24 18:40:46Z theory $
+# $Id: state.t 3030 2006-07-14 21:30:13Z theory $
 
 use strict;
 #use Test::More 'no_plan';
@@ -93,7 +93,7 @@ ok $fsa = $CLASS->new(
     bar => {
         do    => sub {
             my $state = shift;
-            $state->message("bar has been called $counter times");
+            $state->message('bar has been called ', $counter, ' times');
             $state->result($counter++);
         },
         rules => [
