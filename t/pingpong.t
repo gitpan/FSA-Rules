@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# $Id: pingpong.t 1018 2004-12-24 18:40:46Z theory $
+# $Id: pingpong.t 1018 2004-12-24 18:40:46Z david $
 
 use strict;
 use Test::More tests => 16;

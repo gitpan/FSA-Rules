@@ -1,9 +1,10 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 3126 2006-08-29 16:46:40Z theory $
+# $Id: Rules.pm 3707 2008-05-02 20:04:48Z david $
 
 use strict;
-$FSA::Rules::VERSION = '0.26';
+use 5.006_002;
+$FSA::Rules::VERSION = '0.27';
 
 =begin comment
 
@@ -165,7 +166,7 @@ The supported keys in the state definition hash references are:
   label => 'Create a new user',
 
 A label for the state. It might be the question that is being asked within the
-state (think decsision tree), the answer to which determins which rule will
+state (think decision tree), the answer to which determines which rule will
 trigger the switch to the next state. Or it might merely describe what's
 happening in the state.
 
@@ -427,7 +428,7 @@ sub start {
 
   $fsa->switch until $fsa->at('game_over');
 
-Requires a statename. Returns false if the current machine state does not
+Requires a state name. Returns false if the current machine state does not
 match the name. Otherwise, it returns the state.
 
 =cut
@@ -576,8 +577,8 @@ true value unless the C<strict> attribute is set to a true value.
 
 If <strict> is set to a true value, I<all> rules will be evaluated, and if
 more than one returns a true statement, an exception will be thrown. This
-approach guarntees that every attempt to switch from one state to another will
-have one and only one possible destination state to which to switch, thus
+approach guarantees that every attempt to switch from one state to another
+will have one and only one possible destination state to which to switch, thus
 satisfying the DFA pattern.
 
 All arguments passed to C<try_switch> will be passed to the switch rule code
@@ -662,13 +663,13 @@ called without arguments and have I<its> return value returned. A code
 reference should expect the FSA::Rules object passed in as its only argument.
 Note that this varies from the pattern for state actions, which should expect
 the relevant FSA::State object to be passed as the argument. Call the
-C<curr_state()> method on th FSA::Rules object if you want the current state
+C<curr_state()> method on the FSA::Rules object if you want the current state
 in your C<done> code reference.
 
 This method can be useful for checking to see if your state engine is done
 running, and calling C<switch()> when it isn't. States can set it to a true
 value when they consider processing complete, or you can use a code reference
-that evaluates "done-ness" itself. Something like this:
+that determines whether the machine is done. Something like this:
 
   my $fsa = FSA::Rules->new(
       foo => {
@@ -957,7 +958,7 @@ sub stacktrace {
     local $Data::Dumper::Terse     = 1;
     local $Data::Dumper::Indent    = 1;
     local $Data::Dumper::Quotekeys = 0;
-    local $Data::Dumper::Sortkeys  = 0;
+    local $Data::Dumper::Sortkeys  = 1;
     foreach my $state (@$states) {
         $stacktrace .= "State: $state->[0]\n";
         $stacktrace .= Data::Dumper::Dumper($state->[1]);
@@ -979,7 +980,7 @@ C<graph()> are all those supported by the GraphViz constructor; consult the
 L<GraphViz|GraphViz> documentation for details.
 
 Each node in the graph represents a single state. The label for each node in
-the graph will be either the state label or if there is no lable, the state
+the graph will be either the state label or if there is no label, the state
 name.
 
 Each edge in the graph represents a rule that defines the relationship between
@@ -1025,16 +1026,16 @@ version. Defaults to 25.
 =item node_params
 
 A hash reference of parameters to be passed to the GraphViz C<add_node()>
-method when seting up a state as a node. Only the C<label> parameter will be
-ignored. See the C<GraphViz|GraphViz/"add_node"> documentation for the list
-of supported paramters.
+method when setting up a state as a node. Only the C<label> parameter will be
+ignored. See the C<GraphViz|GraphViz/"add_node"> documentation for the list of
+supported parameters.
 
 =item edge_params
 
 A hash reference of parameters to be passed to the GraphViz C<add_node()>
-method when seting up a state as a node. See the
+method when setting up a state as a node. See the
 C<GraphViz|GraphViz/"add_edge"> documentation for the list of supported
-paramters.
+parameters.
 
 =back
 
@@ -1103,9 +1104,9 @@ sub graph {
 
 This method cleans up an FSA::Rules object's internal data when it is released
 from memory. In general, you don't have to worry about the C<DESTROY()> method
-unless you're subclassing FSA::Rules. In that case, if you implement youre own
-C<DESTROY()> method, just be sure to call C<SUPER::DESTROY()> to preven memory
-leaks.
+unless you're subclassing FSA::Rules. In that case, if you implement your own
+C<DESTROY()> method, just be sure to call C<SUPER::DESTROY()> to prevent
+memory leaks.
 
 =cut
 
@@ -1258,9 +1259,9 @@ This is a useful method to store results on a per-state basis. Anything can be
 stored in the result slot. Each time the state is entered, it gets a new
 result slot. Call C<result()> without arguments in a scalar context to get the
 current result; call it without arguments in an array context to get all of
-the reults for the state for each time it has been entered into, from first to
-last. The contents of each result slot can also be viewed in a C<stacktrace>
-or C<raw_stacktrace>.
+the results for the state for each time it has been entered into, from first
+to last. The contents of each result slot can also be viewed in a
+C<stacktrace> or C<raw_stacktrace>.
 
 =cut
 
@@ -1326,9 +1327,9 @@ A shortcut for C<< $state->machine->prev_state >>.
   $state->done($done);
 
 A shortcut for C<< $state->machine->done >>. Note that, unlike C<message> and
-C<result>, done-ness is stored machine-wide, rather than state-wide. You'll
-generally call it on the state object when you want to tell the machine that
-processing is complete.
+C<result>, the C<done> attribute is stored machine-wide, rather than
+state-wide. You'll generally call it on the state object when you want to tell
+the machine that processing is complete.
 
 =head3 notes
 
@@ -1400,9 +1401,9 @@ sub exit {
 
 This method cleans up an FSA::State object's internal data when it is released
 from memory. In general, you don't have to worry about the C<DESTROY()> method
-unless you're subclassing FSA::State. In that case, if you implement youre own
-C<DESTROY()> method, just be sure to call C<SUPER::DESTROY()> to preven memory
-leaks.
+unless you're subclassing FSA::State. In that case, if you implement your own
+C<DESTROY()> method, just be sure to call C<SUPER::DESTROY()> to prevent
+memory leaks.
 
 =cut
 
@@ -1439,6 +1440,8 @@ __END__
 =over
 
 =item Factor FSA::Class into a separate file.
+
+=item Switch to Data::Dump::Streamer for proper serialization of closures.
 
 =back
 
