@@ -1,10 +1,10 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 3707 2008-05-02 20:04:48Z david $
+# $Id: Rules.pm 3932 2008-05-22 03:00:16Z david $
 
 use strict;
 use 5.006_002;
-$FSA::Rules::VERSION = '0.27';
+$FSA::Rules::VERSION = '0.28';
 
 =begin comment
 
@@ -1445,9 +1445,14 @@ __END__
 
 =back
 
-=head1 Bugs
+=head1 Support
 
-Please send bug reports to <bug-fsa-rules@rt.cpan.org>.
+This module is stored in an open repository at the following address:
+
+L<https://svn.kineticode.com/FSA-Rules/trunk/>
+
+Patches against FSA::Rules are welcome. Please send bug reports to
+<bug-fsa-rules@rt.cpan.org>.
 
 =head1 Authors
 
@@ -1460,14 +1465,19 @@ other than all uppercase.
 
 =end comment
 
-David Wheeler <david@kineticode.com>
-Curtis "Ovid" Poe <eop_divo_sitruc@yahoo.com> (reverse the name to email him)
+=over
+
+=item David Wheeler <david@kineticode.com>
+
+=item Curtis "Ovid" Poe <eop_divo_sitruc@yahoo.com> (reverse the name to email him)
+
+=back
 
 =head1 Copyright and License
 
-Copyright (c) 2004-2006 Kineticode, Inc. All Rights Reserved.
+Copyright (c) 2004-2008 David Wheeler. Some Rights Reserved.
 
-This module is free software; you can redistribute it and/or modify it under the
-same terms as Perl itself.
+This module is free software; you can redistribute it and/or modify it under
+the same terms as Perl itself.
 
 =cut
