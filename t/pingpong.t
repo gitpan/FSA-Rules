@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-# $Id: pingpong.t 1018 2004-12-24 18:40:46Z david $
-
 use strict;
 use Test::More tests => 16;
 #use Test::More 'no_plan';

@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-# $Id: base.t 3126 2006-08-29 16:46:40Z david $
-
 use strict;
 #use Test::More 'no_plan';
 use Test::More tests => 316;

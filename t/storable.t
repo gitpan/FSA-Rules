@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-# $Id: storable.t 3707 2008-05-02 20:04:48Z david $
-
 use strict;
 use Test::More;
 use Carp;

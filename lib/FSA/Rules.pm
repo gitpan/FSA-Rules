@@ -1,21 +1,8 @@
 package FSA::Rules;
 
-# $Id: Rules.pm 3932 2008-05-22 03:00:16Z david $
-
 use strict;
 use 5.006_002;
-$FSA::Rules::VERSION = '0.28';
-
-=begin comment
-
-Fake-out Module::Build. Delete if it ever changes to support =head1 headers
-other than all uppercase.
-
-=head1 NAME
-
-FSA::Rules - Build simple rules-based state machines in Perl
-
-=end comment
+$FSA::Rules::VERSION = '0.29';
 
 =head1 Name
 
@@ -1447,27 +1434,19 @@ __END__
 
 =head1 Support
 
-This module is stored in an open repository at the following address:
+This module is stored in an open L<GitHub
+repository|http://github.com/theory/fsa-rules/>. Feel free to fork and
+contribute!
 
-L<https://svn.kineticode.com/FSA-Rules/trunk/>
-
-Patches against FSA::Rules are welcome. Please send bug reports to
-<bug-fsa-rules@rt.cpan.org>.
+Please file bug reports via L<GitHub
+Issues|http://github.com/theory/fsa-rules/issues/> or by sending mail to
+L<bug-FSA-Rules.cpan.org|mailto:bug-FSA-Rules.cpan.org>.
 
 =head1 Authors
 
-=begin comment
-
-Fake-out Module::Build. Delete if it ever changes to support =head1 headers
-other than all uppercase.
-
-=head1 AUTHORS
-
-=end comment
-
 =over
 
-=item David Wheeler <david@kineticode.com>
+=item David E. Wheeler <david@justatheory.com>
 
 =item Curtis "Ovid" Poe <eop_divo_sitruc@yahoo.com> (reverse the name to email him)
 
@@ -1475,7 +1454,7 @@ other than all uppercase.
 
 =head1 Copyright and License
 
-Copyright (c) 2004-2008 David Wheeler. Some Rights Reserved.
+Copyright (c) 2004-2011 David E. Wheeler. Some Rights Reserved.
 
 This module is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

@@ -1,7 +1,5 @@
 #!/usr/bin/perl -w
 
-# $Id: graph.t 3022 2006-07-14 18:26:37Z david $
-
 use strict;
 use Test::More;
 
