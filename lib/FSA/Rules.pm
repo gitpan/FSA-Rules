@@ -2,7 +2,7 @@ package FSA::Rules;
 
 use strict;
 use 5.006_002;
-$FSA::Rules::VERSION = '0.29';
+$FSA::Rules::VERSION = '0.30';
 
 =head1 Name
 
@@ -1440,7 +1440,7 @@ contribute!
 
 Please file bug reports via L<GitHub
 Issues|http://github.com/theory/fsa-rules/issues/> or by sending mail to
-L<bug-FSA-Rules.cpan.org|mailto:bug-FSA-Rules.cpan.org>.
+L<bug-FSA-Rules@rt.cpan.org|mailto:bug-FSA-Rules@rt.cpan.org>.
 
 =head1 Authors
 
@@ -1454,7 +1454,7 @@ L<bug-FSA-Rules.cpan.org|mailto:bug-FSA-Rules.cpan.org>.
 
 =head1 Copyright and License
 
-Copyright (c) 2004-2011 David E. Wheeler. Some Rights Reserved.
+Copyright (c) 2004-2012 David E. Wheeler. Some Rights Reserved.
 
 This module is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

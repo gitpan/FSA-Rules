@@ -1,4 +1,4 @@
-FSA/Rules version 0.29
+FSA/Rules version 0.30
 ======================
 
 FSA::Rules implements a simple state machine pattern, allowing you to quickly
@@ -58,7 +58,7 @@ It does, however recommend the following modules:
 Copyright and License
 ---------------------
 
-Copyright (c) 2002-2011, David E. Wheeler. Some Rights Reserved.
+Copyright (c) 2002-2012, David E. Wheeler. Some Rights Reserved.
 
 This module is free software; you can redistribute it and/or modify it under
 the same terms as Perl itself.

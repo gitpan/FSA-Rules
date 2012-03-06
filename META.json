@@ -4,7 +4,7 @@
       "unknown"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.110440",
+   "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.120351",
    "license" : [
       "perl_5"
    ],
@@ -31,7 +31,7 @@
             "GraphViz" : "2.00",
             "Storable" : "2.05",
             "Test::Pod" : "1.41",
-            "Text::Wrap" : 0
+            "Text::Wrap" : "0"
          },
          "requires" : {
             "perl" : "5.006002"
@@ -41,7 +41,7 @@
    "provides" : {
       "FSA::Rules" : {
          "file" : "lib/FSA/Rules.pm",
-         "version" : "0.29"
+         "version" : "0.30"
       },
       "FSA::State" : {
          "file" : "lib/FSA/Rules.pm",
@@ -61,5 +61,5 @@
          "url" : "http://github.com/theory/fsa-rules/"
       }
    },
-   "version" : "0.29"
+   "version" : "0.30"
 }
