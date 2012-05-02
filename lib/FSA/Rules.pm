@@ -2,7 +2,7 @@ package FSA::Rules;
 
 use strict;
 use 5.006_002;
-$FSA::Rules::VERSION = '0.30';
+$FSA::Rules::VERSION = '0.31';
 
 =head1 Name
 
@@ -133,6 +133,11 @@ A value to which to set the C<strict> attribute.
 
 The name of the class to use for state objects. Defaults to "FSA::State". Use
 this parameter if you want to use a subclass of FSA::State.
+
+=item state_params
+
+A hash reference of parameters to pass as a list to the C<state_class>
+constructor.
 
 =back
 
@@ -303,7 +308,8 @@ sub new {
         self   => $self,
     };
 
-    $params->{state_class} ||= 'FSA::State';
+    $params->{state_class}  ||= 'FSA::State';
+    $params->{state_params} ||= {};
     while (@_) {
         my $state = shift;
         my $def   = shift;
@@ -320,7 +326,7 @@ sub new {
         }
 
         # Create the state object and cache the state data.
-        my $obj = $params->{state_class}->new;
+        my $obj = $params->{state_class}->new(%{$params->{state_params}});
         $def->{name} = $state;
         $def->{machine} = $self;
         $fsa->{table}{$state} = $obj;

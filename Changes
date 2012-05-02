@@ -1,5 +1,10 @@
 Revision history for Perl extension FSA::Rules.
 
+0.31  2012-05-02T16:04:15Z
+      - Added `state_params` parameter to `new()`. The specified hash
+        reference will be passed as a list to the `state_class` constructor.
+        Patch from Chia-liang Kao.
+
 0.30  2012-03-06T05:03:37Z
       - Fixed broken rt.cpan.org email address.
       - Fixed failed tests in `t/graph.t` on Windows.
